@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express= require('express')
 
 const app = express();
@@ -22,6 +23,8 @@ const req = require('express/lib/request');
 const order = require('./order');
 const Car = require('./Car');
 const Order = require('./order');
+const jwt = require('jsonwebtoken');
+const auth = require('./auth/auth');
 // import Cart from './cart.js';
 
 
@@ -395,52 +398,166 @@ app.post('/loginadmin',async (req,res)=>{
        console.log(error) 
     }
 })
-app.post('/registeruser',async (req,res)=>{
+app.post('/registeruser', auth, async (req, res) => {
+console.log(req.body,"-----------------------------")
     try {
-        console.log(req.body)
-        const name=req.body.name
-        const email=req.body.email
-        const number=req.body.number
-        const password=req.body.password
-        const userdata=await person.create({
-            name:name,
-            email:email,
-            number:number,
-            password:password
-        })
-        if(userdata){
-            res.json({message:"user registered successfully",
-                success:true
-            })
+        
+        const { name, email, number, password } = req.body;
+         console.log(req.body,"-----------------------------")
+        // CHECK USER EXISTS
+        const existingUser = await person.findOne({ email });
+
+        if (existingUser) {
+
+            return res.json({
+
+                success: false,
+
+                message: "User already exists"
+
+            });
+
         }
-        else{
-            res.json({message:"user registration failed",
-                success:false
-            })
-        }
+
+        // HASH PASSWORD
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // CREATE USER
+        const userdata = await person.create({
+            name,
+            email,
+            number,
+            password: hashedPassword
+
+        });
+        console.log(userdata,"------------------------")
+        res.json({
+
+            success: true,
+
+            message: "Registration successful",
+
+            user: {
+
+                _id: userdata._id,
+
+                name: userdata.name,
+
+                email: userdata.email,
+
+                number: userdata.number
+
+                
+
+            }
+
+        });
+
     } catch (error) {
-        console.log(error)
+
+        console.log(error);
+
+        res.status(500).json({
+
+            success: false,
+
+            message: "Server error"
+
+        });
+
     }
-})
-app.post('/loginuser',async (req,res)=>{
+
+});
+app.post('/loginuser', async (req, res) => {
+
     try {
-        const {email,password}=req.body
-        const userdata=await person.findOne({email:email})
-        if(!userdata){
-            return res.json({message:"user not found"})
+
+        const { email, password } = req.body;
+
+        // FIND USER
+        const userdata = await person.findOne({ email });
+
+        if (!userdata) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message: "User not found"
+
+            });
+
         }
-        if(password===userdata.password){
-            res.json({message:"login success",
-                      success:true,
-                      user:userdata})
-        }else{
-            res.json({message:"login failed",success:false})
+
+        // CHECK PASSWORD
+        const isMatch = await bcrypt.compare(
+
+            password,
+            userdata.password
+
+        );
+
+        if (!isMatch) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                message: "Wrong password"
+
+            });
+
         }
+         
+        // CREATE TOKEN
+        const token = jwt.sign(
+
+            {
+                id: userdata._id
+            },
+
+            process.env.JWT_SECRET,
+
+            {
+                expiresIn: "7d"
+            }
+
+        );
+
+        // SUCCESS
+        res.json({
+
+            success: true,
+
+            token,
+
+            user: {
+
+                _id: userdata._id,
+                name: userdata.name,
+                email: userdata.email,
+                number: userdata.number
+
+            }
+
+        });
+
     } catch (error) {
-       console.log(error) 
+
+        console.log(error);
+
+        res.status(500).json({
+
+            success: false,
+
+            message: "Server error"
+
+        });
+
     }
-})
-app.post("/addtocart", async (req, res) => {
+
+});
+app.post("/addtocart",auth,async (req, res) => {
   try {
     const { userId, productId } = req.body;
 
@@ -486,7 +603,7 @@ app.post("/addtocart", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-app.get('/viewcart/:id', async (req, res) => {
+app.get('/viewcart/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -504,7 +621,7 @@ app.get('/viewcart/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-app.delete("/removefromcart", async (req, res) => {
+app.delete("/removefromcart", auth, async (req, res) => {
   try {
     const { userId, productId } = req.body;
 
@@ -532,7 +649,7 @@ app.delete("/removefromcart", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-app.put("/updatequantity", async (req, res) => {
+app.put("/updatequantity", auth, async (req, res) => {
   try {
     const { userId, productId, action } = req.body;
 
@@ -572,7 +689,7 @@ app.put("/updatequantity", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-app.get('/checkout/:id', async (req, res) => {
+app.get('/checkout/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -590,7 +707,7 @@ app.get('/checkout/:id', async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-app.post('/placeorder', async (req, res) => {
+app.post('/placeorder', auth, async (req, res) => {
   try {
     const { userId, items, totalAmount } = req.body;
 
@@ -615,7 +732,7 @@ app.post('/placeorder', async (req, res) => {
   }
 });
 
-app.get("/myorders/:userId", async (req, res) => {
+app.get("/myorders/:userId", auth, async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -631,7 +748,7 @@ app.get("/myorders/:userId", async (req, res) => {
   }
 
 });
-app.put("/orders/:id/cancel", async (req, res) => {
+app.put("/orders/:id/cancel", auth, async (req, res) => {
 
   try {
 
