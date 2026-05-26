@@ -378,6 +378,7 @@ app.post('/addnewadmin',async (req,res)=>{
         console.log(error)
     }
 })
+//chnaged authentication to admin login
 app.post('/loginadmin',async (req,res)=>{
     try {
          const {email,password}=req.body
@@ -398,7 +399,7 @@ app.post('/loginadmin',async (req,res)=>{
        console.log(error) 
     }
 })
-app.post('/registeruser', auth, async (req, res) => {
+app.post('/registeruser', async (req, res) => {
 console.log(req.body,"-----------------------------")
     try {
         
@@ -473,10 +474,10 @@ app.post('/loginuser', async (req, res) => {
     try {
 
         const { email, password } = req.body;
-
+        console.log(req.body,"-----------------------------")
         // FIND USER
         const userdata = await person.findOne({ email });
-
+        console.log(userdata,"-----------------------------")
         if (!userdata) {
 
             return res.status(401).json({
@@ -496,7 +497,7 @@ app.post('/loginuser', async (req, res) => {
             userdata.password
 
         );
-
+console.log(isMatch,"-----------------------------")
         if (!isMatch) {
 
             return res.status(401).json({
@@ -557,10 +558,10 @@ app.post('/loginuser', async (req, res) => {
     }
 
 });
-app.post("/addtocart",auth,async (req, res) => {
+app.post("/addtocart",async (req, res) => {
   try {
     const { userId, productId } = req.body;
-
+    console.log("Add to cart request:", { userId, productId });
     if (!userId || !productId) {
       return res.status(400).json({ message: "Missing data" });
     }
