@@ -432,111 +432,30 @@ console.log(req.body,"-----------------------------")
 
         });
         console.log(userdata,"------------------------")
+
+        // GENERATE TOKEN (same as login)
+        const token = jwt.sign(
+            { id: userdata._id },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
         res.json({
 
             success: true,
 
             message: "Registration successful",
 
-            user: {
-
-                _id: userdata._id,
-
-                name: userdata.name,
-
-                email: userdata.email,
-
-                number: userdata.number
-
-                
-
-            }
-
-        });
-
-    } catch (error) {
-
-        console.log(error);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: "Server error"
-
-        });
-
-    }
-
-});
-app.post('/loginuser', async (req, res) => {
-
-    try {
-
-        const { email, password } = req.body;
-        console.log(req.body,"-----------------------------")
-        // FIND USER
-        const userdata = await person.findOne({ email });
-        console.log(userdata,"-----------------------------")
-        if (!userdata) {
-
-            return res.status(401).json({
-
-                success: false,
-
-                message: "User not found"
-
-            });
-
-        }
-
-        // CHECK PASSWORD
-        const isMatch = await bcrypt.compare(
-
-            password,
-            userdata.password
-
-        );
-console.log(isMatch,"-----------------------------")
-        if (!isMatch) {
-
-            return res.status(401).json({
-
-                success: false,
-
-                message: "Wrong password"
-
-            });
-
-        }
-         
-        // CREATE TOKEN
-        const token = jwt.sign(
-
-            {
-                id: userdata._id
-            },
-
-            process.env.JWT_SECRET,
-
-            {
-                expiresIn: "7d"
-            }
-
-        );
-
-        // SUCCESS
-        res.json({
-
-            success: true,
-
             token,
 
             user: {
 
                 _id: userdata._id,
+
                 name: userdata.name,
+
                 email: userdata.email,
+
                 number: userdata.number
 
             }
@@ -558,40 +477,134 @@ console.log(isMatch,"-----------------------------")
     }
 
 });
-app.post("/addtocart",async (req, res) => {
+app.post("/loginuser", async (req, res) => {
+
   try {
-    const { userId, productId } = req.body;
-    console.log("Add to cart request:", { userId, productId });
-    if (!userId || !productId) {
-      return res.status(400).json({ message: "Missing data" });
+
+    const { email, password } = req.body;
+
+    console.log(req.body);
+
+    // FIND USER
+    const userdata = await person.findOne({ email });
+
+    if (!userdata) {
+
+      return res.status(401).json({
+        success: false,
+        message: "User not found"
+      });
+
     }
 
-    console.log("Finding cart for user:", userId);
+    // CHECK PASSWORD
+    const isMatch = await bcrypt.compare(
+      password,
+      userdata.password
+    );
+
+    if (!isMatch) {
+
+      return res.status(401).json({
+        success: false,
+        message: "Wrong password"
+      });
+
+    }
+
+    // CREATE TOKEN
+    const token = jwt.sign(
+      {
+        id: userdata._id
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d"
+      }
+    );
+
+    // RESPONSE
+    res.status(200).json({
+
+      success: true,
+
+      token,
+
+      user: {
+        _id: userdata._id,
+        name: userdata.name,
+        email: userdata.email,
+        number: userdata.number
+      }
+
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+
+  }
+
+});
+app.post("/addtocart", auth, async (req, res) => {
+
+  try {
+
+    console.log("ADD TO CART REQUEST");
+
+    const userId = req.user.id;
+
+    const { productId } = req.body;
+
+    console.log("USER:", userId);
+    console.log("PRODUCT:", productId);
+
+    if (!productId) {
+      return res.status(400).json({
+        message: "Missing productId"
+      });
+    }
+
     let CartData = await Cart.findOne({ userId });
-    console.log("Cart found:", CartData);
 
     if (!CartData) {
-      
+
       CartData = new Cart({
         userId,
-        items: [{ productId, quantity: 1 }]
+        items: [
+          {
+            productId,
+            quantity: 1
+          }
+        ]
       });
+
     } else {
-      
+
       const itemIndex = CartData.items.findIndex(
         item => item.productId.toString() === productId
       );
 
       if (itemIndex > -1) {
-        
+
         CartData.items[itemIndex].quantity += 1;
+
       } else {
-        
-        CartData.items.push({ productId, quantity: 1 });
+
+        CartData.items.push({
+          productId,
+          quantity: 1
+        });
+
       }
+
     }
 
-    // ✅ Save cart
     await CartData.save();
 
     res.status(200).json({
@@ -600,17 +613,23 @@ app.post("/addtocart",async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Add to cart error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    console.log("ADD TO CART ERROR:", error);
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
+
 });
 app.get('/viewcart/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
-
+    console.log("View cart request for user ID:", id);
     const viewcart = await Cart.findOne({ userId: id })
       .populate('items.productId');
-
+      console.log("Cart data retrieved:", viewcart);
     if (!viewcart) {
       return res.json({ items: [] });
     }
